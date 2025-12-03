@@ -192,7 +192,7 @@ Currently, the project focuses on manual testing. Future iterations will include
 
 1. Clone the repository
 ```bash
-git clone <repository-url>
+git clone <https://github.com/soha131/product_details_task.git>
 cd product_details_task
 ```
 
@@ -205,6 +205,7 @@ flutter pub get
 ```bash
 flutter run
 ```
+
 
 ### API Configuration
 
