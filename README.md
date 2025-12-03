@@ -258,13 +258,6 @@ The app connects to:
 
 ---
 
-## 📸 Screenshots
-
-| Home Screen                                          | Product Details | Reviews |
-|------------------------------------------------------|----------------|---------|
-| ![Product Details](screenshots/product_details.jpeg) | ![Details](screenshots/details.jpeg) | ![Reviews](screenshots/review.jpeg) |
-
----
 
 ## 🤝 Contributing
 
@@ -288,8 +281,8 @@ This project is open source and available under the MIT License.
 
 **Soha Ahmed**
 
-- GitHub: [@yourusername](https://github.com/yourusername)
-- LinkedIn: [Your Name](https://linkedin.com/in/yourname)
+- GitHub: [@soha](https://github.com/soha131)
+- LinkedIn: [Soha Ahmed](www.linkedin.com/in/soha-ahmed-5854201b9)
 
 
 ---
