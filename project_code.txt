@@ -1,0 +1,1377 @@
+﻿===== E:\product_details_task\lib\core\api_service.dart =====
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+
+class ApiService {
+  static const String baseUrl = "https://task-two-plum-44.vercel.app/api";
+
+  Future<dynamic> get(String endpoint) async {
+    final url = Uri.parse("$baseUrl$endpoint");
+
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception("Failed to load data: ${response.statusCode}");
+    }
+  }
+
+}
+===== E:\product_details_task\lib\features\product_details\cubit\product_details_cubit.dart =====
+import 'dart:developer';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../data/models/product_model.dart';
+import '../data/repository/product_repo.dart';
+import 'product_details_state.dart';
+
+class ProductDetailsCubit extends Cubit<ProductDetailsState> {
+  final ProductRepository repository;
+
+  ProductDetailsCubit(this.repository) : super(ProductDetailsInitial());
+
+  Future<void> getProductDetails(int id) async {
+    if (state is ProductDetailsLoading) return;
+
+    emit(ProductDetailsLoading());
+
+    try {
+      final product = await repository.getProductById(id);
+      emit(ProductDetailsSuccess(product));
+    } catch (e, stack) {
+      log("Error loading product details: $e", stackTrace: stack);
+      emit(ProductDetailsError(e.toString()));
+    }
+  }
+
+
+}
+===== E:\product_details_task\lib\features\product_details\cubit\product_details_state.dart =====
+import 'package:equatable/equatable.dart';
+
+import '../data/models/product_model.dart';
+
+abstract class ProductDetailsState extends Equatable {
+  @override
+  List<Object?> get props => [];
+}
+
+class ProductDetailsInitial extends ProductDetailsState {}
+
+class ProductDetailsLoading extends ProductDetailsState {}
+
+class ProductDetailsSuccess extends ProductDetailsState {
+  final Product product;
+
+  ProductDetailsSuccess(this.product);
+
+  @override
+  List<Object?> get props => [product];
+}
+
+class ProductDetailsError extends ProductDetailsState {
+  final String message;
+
+  ProductDetailsError(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
+===== E:\product_details_task\lib\features\product_details\data\models\category_model.dart =====
+class Category {
+  final int id;
+  final String name;
+  final String slug;
+
+  Category({
+    required this.id,
+    required this.name,
+    required this.slug,
+  });
+
+  factory Category.fromJson(Map<String, dynamic> json) {
+    return Category(
+      id: json["id"] ?? 0,
+      name: json["name"] ?? "Unknown",
+      slug: json["slug"] ?? "",
+    );
+  }
+}
+===== E:\product_details_task\lib\features\product_details\data\models\product_model.dart =====
+import 'category_model.dart';
+import 'review_model.dart';
+
+class Product {
+  final int id;
+  final Category category;
+  final String name;
+  final String price;
+  final String discountPrice;
+  final String brand;
+  final String description;
+  final String image;
+  final String material;
+  final String length;
+  final List<Review> reviews;
+  final double averageRating;
+  final bool isFavorite;
+
+  Product ({
+    required this.id,
+    required this.category,
+    required this.name,
+    required this.price,
+    required this.discountPrice,
+    required this.brand,
+    required this.description,
+    required this.image,
+    required this.material,
+    required this.length,
+    required this.reviews,
+    required this.averageRating,
+    required this.isFavorite,
+  });
+
+  factory Product.fromJson(Map<String, dynamic> json) {
+    return Product(
+      id: json["id"] ?? 0,
+      category:
+          json["category"] != null
+              ? Category.fromJson(json["category"])
+              : Category(id: 0, name: "unknown", slug: ""),
+      name: json["name"] ?? "unknown",
+      price: json["price"] ?? "0",
+      discountPrice: json["discount_price"] ?? "0",
+      brand: json["brand"] ?? "",
+      description: json["description"] ?? "",
+      image: json["image"] ?? "https://via.placeholder.com/150",
+      material: json["material"] ?? "",
+      length: json["length"] ?? "",
+      reviews:
+          json["reviews"] != null
+              ? (json["reviews"] as List)
+                  .map((e) => Review.fromJson(e))
+                  .toList()
+              : [],
+      averageRating:
+          json["average_rating"] != null
+              ? (json["average_rating"] as num).toDouble()
+              : 0.0,
+      isFavorite: json["is_favorite"] ?? false,
+    );
+  }
+}
+===== E:\product_details_task\lib\features\product_details\data\models\review_model.dart =====
+class Review {
+  final int id;
+  final String user;
+  final int rating;
+  final String comment;
+  final String createdAt;
+
+  Review({
+    required this.id,
+    required this.user,
+    required this.rating,
+    required this.comment,
+    required this.createdAt,
+  });
+
+  factory Review.fromJson(Map<String, dynamic> json) {
+    return Review(
+      id: json["id"] ?? 0,
+      user: json["user"] ?? "Unknown",
+      rating: json["rating"] ?? 0,
+      comment: json["comment"] ?? "",
+      createdAt: json["created_at"] ?? "",
+    );
+  }
+}
+===== E:\product_details_task\lib\features\product_details\data\repository\product_repo.dart =====
+import '../../../../core/api_service.dart';
+import '../models/product_model.dart';
+
+class ProductRepository {
+  final ApiService api;
+
+  ProductRepository(this.api);
+
+  Future<List<Product>> getAllProducts() async {
+    final data = await api.get("/products/");
+    return (data as List).map((e) => Product.fromJson(e)).toList();
+  }
+
+  Future<Product> getProductById(int id) async {
+    final data = await api.get("/products/$id/");
+    return Product.fromJson(data);
+  }
+
+}
+===== E:\product_details_task\lib\features\product_details\screens\help_screen.dart =====
+import 'package:flutter/material.dart';
+
+class HelpTab extends StatelessWidget {
+  const HelpTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Icon with background circle
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3E0),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFE7E00).withOpacity(0.15),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.help_outline_rounded,
+              size: 64,
+              color: const Color(0xFFFE7E00),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Main title
+          const Text(
+            "Need help with this product?",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              height: 1.3,
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Description
+          Text(
+            "If you have any questions about this item, feel free to contact our support team or check the FAQ section.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              color: Colors.grey[600],
+              height: 1.6,
+            ),
+          ),
+
+          const SizedBox(height: 40),
+
+        ],
+      ),
+    );
+  }
+}
+===== E:\product_details_task\lib\features\product_details\screens\product_details_screen.dart =====
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../cubit/product_details_cubit.dart';
+import '../cubit/product_details_state.dart';
+import '../data/models/product_model.dart';
+import '../data/repository/product_repo.dart';
+import '../widgets/bottom_buy_bar.dart';
+import '../widgets/custom_tab_bar.dart';
+import '../widgets/product_tab.dart';
+import 'help_screen.dart';
+import 'review_screen.dart';
+
+class ProductDetailsScreen extends StatelessWidget {
+  final int productId;
+  const ProductDetailsScreen({super.key, required this.productId});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create:
+          (_) =>
+              ProductDetailsCubit(context.read<ProductRepository>())
+                ..getProductDetails(productId),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: _buildAppBar(),
+        body: BlocBuilder<ProductDetailsCubit, ProductDetailsState>(
+          builder: (context, state) {
+            if (state is ProductDetailsLoading) {
+              return const Center(
+                child: CircularProgressIndicator(color: Color(0xFFFE7E00)),
+              );
+            }
+            if (state is ProductDetailsError) {
+              return Center(child: Text(state.message));
+            }
+            if (state is ProductDetailsSuccess) {
+              return ProductDetailsBody(product: state.product);
+            }
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      leading: const BackButton(color: Colors.black),
+      title: BlocBuilder<ProductDetailsCubit, ProductDetailsState>(
+        builder: (context, state) {
+          final category =
+              state is ProductDetailsSuccess
+                  ? state.product.category.name
+                  : '...';
+          return Text(
+            "Clothes / $category",
+            style: const TextStyle(color: Colors.black, fontSize: 16),
+          );
+        },
+      ),
+      centerTitle: true,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black),
+          onPressed: () {},
+        ),
+      ],
+    );
+  }
+}
+
+class ProductDetailsBody extends StatefulWidget {
+  final Product product;
+  const ProductDetailsBody({super.key, required this.product});
+
+  @override
+  State<ProductDetailsBody> createState() => _ProductDetailsBodyState();
+}
+
+class _ProductDetailsBodyState extends State<ProductDetailsBody>
+    with TickerProviderStateMixin {
+  late TabController _tabController;
+  bool isDescriptionExpanded = true;
+  int quantity = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        CustomTabBar(controller: _tabController),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              ProductTab(
+                product: widget.product,
+                isDescriptionExpanded: isDescriptionExpanded,
+                onToggleDescription:
+                    () => setState(
+                      () => isDescriptionExpanded = !isDescriptionExpanded,
+                    ),
+              ),
+              ReviewsTab(reviews: widget.product.reviews),
+              const HelpTab(),
+            ],
+          ),
+        ),
+        BottomBuyBar(
+          quantity: quantity,
+          onIncrease: () => setState(() => quantity++),
+          onDecrease: () => quantity > 1 ? setState(() => quantity--) : null,
+        ),
+      ],
+    );
+  }
+}
+===== E:\product_details_task\lib\features\product_details\screens\review_screen.dart =====
+import 'package:flutter/material.dart';
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import '../data/models/review_model.dart';
+
+class ReviewsTab extends StatelessWidget {
+  final List<Review> reviews;
+
+  const ReviewsTab({super.key, required this.reviews});
+
+  @override
+  Widget build(BuildContext context) {
+    if (reviews.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.rate_review_outlined, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            const Text(
+              "No reviews yet",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Be the first to review this product!",
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 100), // extra bottom for floating button/bar
+      itemCount: reviews.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final review = reviews[index];
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // User Avatar
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.orange.shade100,
+                    child: Text(
+                      review.user.isNotEmpty ? review.user[0].toUpperCase() : "U",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Name + Date
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          review.user,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatDate(review.createdAt),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Stars
+                  RatingBarIndicator(
+                    rating: review.rating.toDouble(),
+                    itemSize: 18,
+                    unratedColor: Colors.grey[300],
+                    itemBuilder: (_, __) => const Icon(
+                      Icons.star_rounded,
+                      color: Color(0xFFFF9F00),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              // Review comment
+              Text(
+                review.comment,
+                style: const TextStyle(
+                  fontSize: 14.5,
+                  height: 1.55,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inDays > 30) {
+        return "${date.day}/${date.month}/${date.year}";
+      } else if (difference.inDays >= 7) {
+        return "${difference.inDays ~/ 7} week${difference.inDays ~/ 7 > 1 ? 's' : ''} ago";
+      } else if (difference.inDays >= 1) {
+        return "${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago";
+      } else if (difference.inHours >= 1) {
+        return "${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago";
+      } else {
+        return "Just now";
+      }
+    } catch (e) {
+      return dateString.split('T').first;
+    }
+  }
+}
+===== E:\product_details_task\lib\features\product_details\utils\price_calculator.dart =====
+class PriceCalculator {
+  static Map<String, dynamic> calculate({
+    required String price,
+    required String? discountPrice,
+  }) {
+    final cleanPrice = price.replaceAll(',', '').trim();
+    final cleanDiscount = (discountPrice ?? "").replaceAll(',', '').trim();
+
+    var original = double.tryParse(cleanPrice) ?? 0.0;
+    var discount = double.tryParse(cleanDiscount) ?? 0.0;
+
+    // Fix swapped logic
+    if (discount > original && discount > 0) {
+      final temp = original;
+      original = discount;
+      discount = temp;
+    }
+
+    final hasDiscount = discount > 0 && discount < original;
+    final percentage = hasDiscount
+        ? ((original - discount) / original * 100).round()
+        : 0;
+
+    return {
+      'originalPrice': original,
+      'discountPrice': discount,
+      'hasDiscount': hasDiscount,
+      'discountPercentage': hasDiscount ? '-$percentage%' : '',
+      'displayPrice': hasDiscount ? discount : original,
+      'displayOriginal': hasDiscount ? original : null,
+    };
+  }
+}
+===== E:\product_details_task\lib\features\product_details\widgets\bottom_buy_bar.dart =====
+import 'package:flutter/material.dart';
+
+class BottomBuyBar extends StatelessWidget {
+  final int quantity;
+  final VoidCallback onIncrease;
+  final VoidCallback? onDecrease;
+
+  const BottomBuyBar({
+    super.key,
+    required this.quantity,
+    required this.onIncrease,
+    required this.onDecrease,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -2)),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () {},
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFE7E00),
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text("Buy Now", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+              ),
+            ),
+            const SizedBox(width: 20),
+            Row(
+              children: [
+                _quantityBtn(Icons.remove, onDecrease),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text('$quantity', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                ),
+                _quantityBtn(Icons.add, onIncrease),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  Widget _quantityBtn(IconData icon, VoidCallback? onPressed) {
+    final isDisabled = onPressed == null;
+
+    return GestureDetector(
+      onTap: isDisabled ? null : onPressed,
+      child: Container(
+        height: 40,
+        width: 40,
+        decoration: BoxDecoration(
+          color: isDisabled ? Colors.grey[300] : Colors.grey[200],
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            if (!isDisabled)
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          size: 20,
+          color: isDisabled ? Colors.grey.shade400 : Colors.black,
+        ),
+      ),
+    );
+  }
+
+}
+===== E:\product_details_task\lib\features\product_details\widgets\custom_tab_bar.dart =====
+import 'package:flutter/material.dart';
+
+class CustomTabBar extends StatelessWidget {
+  final TabController controller;
+  const CustomTabBar({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      color: Colors.white,
+      child: Container(
+        height: 46,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: TabBar(
+          controller: controller,
+          labelColor: const Color(0xFFFE7E00),
+          unselectedLabelColor: Colors.grey.shade600,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
+          indicator: const BoxDecoration(),
+          dividerColor: Colors.transparent,
+          tabs: const [
+            Tab(text: "Product"),
+            Tab(text: "Review"),
+            Tab(text: "Help"),
+          ],
+        ),
+      ),
+    );
+  }
+}
+===== E:\product_details_task\lib\features\product_details\widgets\description_section.dart =====
+import 'package:flutter/material.dart';
+
+class DescriptionSection extends StatelessWidget {
+  final String description;
+  final bool isExpanded;
+  final VoidCallback onToggle;
+
+  const DescriptionSection({
+    super.key,
+    required this.description,
+    required this.isExpanded,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              "Description",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            IconButton(
+              icon: Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down),
+              onPressed: onToggle,
+            ),
+          ],
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          child: isExpanded
+              ? Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              description,
+              style: TextStyle(color: Colors.grey.shade700, height: 1.6),
+            ),
+          )
+              : const SizedBox(),
+        ),
+      ],
+    );
+  }
+}
+===== E:\product_details_task\lib\features\product_details\widgets\price_section.dart =====
+import 'package:flutter/material.dart';
+import '../data/models/product_model.dart';
+import '../utils/price_calculator.dart';
+
+class PriceSection extends StatelessWidget {
+  final Product product;
+  const PriceSection({super.key, required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    final priceData = PriceCalculator.calculate(
+      price: product.price,
+      discountPrice: product.discountPrice,
+    );
+
+    return Column(
+      children: [
+        if (priceData['hasDiscount'])
+          Align(
+            alignment: Alignment.topLeft,
+            child: Text(
+              "${priceData['displayOriginal'].toStringAsFixed(3)} KWD",
+              style: const TextStyle(
+                fontSize: 19,
+                color: Colors.red,
+                decoration: TextDecoration.lineThrough,
+                decorationThickness: 2,
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "${priceData['displayPrice'].toStringAsFixed(3)} KWD",
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(width: 12),
+            if (priceData['hasDiscount'])
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Text(
+                  priceData['discountPercentage'],
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+===== E:\product_details_task\lib\features\product_details\widgets\product_image_section.dart =====
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
+
+class ProductImageSection extends StatelessWidget {
+  final String? imageUrl;
+  final String placeholderAsset;
+
+  const ProductImageSection({
+    super.key,
+    required this.imageUrl,
+    this.placeholderAsset = "assets/images/no_image.jpg",
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValidUrl = imageUrl != null && imageUrl!.isNotEmpty;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            width: double.infinity,
+            constraints: const BoxConstraints(maxWidth: 420), // Ø£Ù‚ØµÙ‰ Ø¹Ø±Ø¶ (Ù…Ø«Ø§Ù„ÙŠ Ù„Ù„Ù…ÙˆØ¨Ø§ÙŠÙ„ ÙˆØ§Ù„ØªØ§Ø¨Ù„Øª)
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: AspectRatio(
+              aspectRatio: 1 / 1.15,
+              child: hasValidUrl
+                  ? CachedNetworkImage(
+                imageUrl: imageUrl!,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Shimmer.fromColors(
+                  baseColor: Colors.grey[300]!,
+                  highlightColor: Colors.grey[100]!,
+                  child: Container(color: Colors.grey[300]),
+                ),
+                errorWidget: (_, __, ___) => Image.asset(
+                  placeholderAsset,
+                  fit: BoxFit.cover,
+                ),
+              )
+                  : Image.asset(
+                placeholderAsset,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+===== E:\product_details_task\lib\features\product_details\widgets\product_tab.dart =====
+import 'package:flutter/material.dart';
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import '../data/models/product_model.dart';
+import 'description_section.dart';
+import 'price_section.dart';
+import 'product_image_section.dart';
+import 'related_products_section.dart';
+
+class ProductTab extends StatelessWidget {
+  final Product product;
+  final bool isDescriptionExpanded;
+  final VoidCallback onToggleDescription;
+
+  const ProductTab({
+    super.key,
+    required this.product,
+    required this.isDescriptionExpanded,
+    required this.onToggleDescription,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          const SizedBox(height: 16),
+          ProductImageSection(imageUrl: product.image),
+          const SizedBox(height: 16),
+          _buildActionButtons(),
+          const SizedBox(height: 16),
+          _buildImageIndicators(),
+          const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                Text(product.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 14),
+                PriceSection(product: product),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 6),
+                _buildBrandAndRating(),
+                const SizedBox(height: 20),
+                DescriptionSection(
+                  description: product.description,
+                  isExpanded: isDescriptionExpanded,
+                  onToggle: onToggleDescription,
+                ),
+                const SizedBox(height: 30),
+                RelatedProductsSection(currentProduct: product),
+                const SizedBox(height: 100),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: Icon(
+              product.isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: product.isFavorite ? Colors.red : Colors.black,
+              size: 28,
+            ),
+            onPressed: () {
+
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.ios_share, color: Colors.black, size: 28),
+            onPressed: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageIndicators() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(4, (i) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: i == 0 ? 28 : 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: i == 0 ? const Color(0xFFFE7E00) : Colors.orange.shade200,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildBrandAndRating() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "Brand: ${product.brand}",
+            ),
+            InkWell(
+              onTap: () {
+              },
+              splashColor: Colors.grey.shade50,
+              highlightColor: Colors.transparent,
+              hoverColor: Colors.grey.shade50,
+              child: Row(
+                children: const [
+                  Text(
+                    "More",
+                    style: TextStyle(
+
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 14,
+
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 6),
+        const Divider(),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            RatingBarIndicator(
+              rating: product.averageRating,
+              itemSize: 22,
+              itemBuilder: (_, __) => const Icon(Icons.star, color: Colors.amber),
+            ),
+            const SizedBox(width: 8),
+            Text("${product.averageRating}", style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(width: 6),
+            Text("(${product.reviews.length} Reviewers)", style: const TextStyle(color: Colors.grey)),
+            const Spacer(),
+            Text("SKU: ${product.id}"),
+          ],
+        ),
+      ],
+    );
+  }
+}
+===== E:\product_details_task\lib\features\product_details\widgets\related_products_section.dart =====
+import 'package:flutter/material.dart';
+import '../data/models/product_model.dart';
+import '../data/repository/product_repo.dart';
+import 'similar_product_card.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+class RelatedProductsSection extends StatefulWidget {
+  final Product currentProduct;
+
+  const RelatedProductsSection({super.key, required this.currentProduct});
+
+  @override
+  State<RelatedProductsSection> createState() => _RelatedProductsSectionState();
+}
+
+class _RelatedProductsSectionState extends State<RelatedProductsSection> {
+  late final Future<List<Product>> _productsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _productsFuture = context.read<ProductRepository>().getAllProducts();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Product>>(
+      future: _productsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(
+              child: CircularProgressIndicator(color: Color(0xFFFE7E00)),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox();
+        }
+
+        final related =
+            snapshot.data!
+                .where(
+                  (p) =>
+                      p.category.id == widget.currentProduct.category.id &&
+                      p.id != widget.currentProduct.id,
+                )
+                .take(12)
+                .toList();
+
+        if (related.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(20),
+            child: Center(child: Text("No Related Products Found")),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: const [
+                  Expanded(child: Divider(color: Colors.grey, thickness: 1)),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      "Related Products",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: Colors.grey, thickness: 1)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = constraints.maxWidth > 600 ? 4 : 2;
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: crossAxisCount == 2 ? 0.50 : 0.45,
+                  ),
+                  itemCount: related.length,
+                  itemBuilder:
+                      (context, index) =>
+                          SimilarProductCard(product: related[index]),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        );
+      },
+    );
+  }
+}
+===== E:\product_details_task\lib\features\product_details\widgets\similar_product_card.dart =====
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
+import '../data/models/product_model.dart';
+import '../utils/price_calculator.dart';
+
+class SimilarProductCard extends StatelessWidget {
+  final Product product;
+  final String placeholderAsset;
+
+  const SimilarProductCard({
+    super.key,
+    required this.product,
+    this.placeholderAsset = "assets/images/no_image.jpg",
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final priceData = PriceCalculator.calculate(
+      price: product.price,
+      discountPrice: product.discountPrice,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Ø§Ù„ØµÙˆØ±Ø© Ø¨Ù†Ø³Ø¨Ø© Ø«Ø§Ø¨ØªØ©
+          Expanded(
+            flex: 5, // Ø§Ù„ØµÙˆØ±Ø© ØªØ£Ø®Ø¯ Ø­ÙˆØ§Ù„ÙŠ 55-60% Ù…Ù† Ø§Ù„Ø§Ø±ØªÙØ§Ø¹
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: CachedNetworkImage(
+                imageUrl: product.image,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Shimmer.fromColors(
+                  baseColor: Colors.grey[300]!,
+                  highlightColor: Colors.grey[100]!,
+                  child: Container(color: Colors.grey[300]),
+                ),
+                errorWidget: (_, __, ___) => Image.asset(
+                  placeholderAsset,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ),
+
+          // Ø§Ù„Ù…Ø­ØªÙˆÙ‰ + Ø§Ù„Ø²Ø±Ø§ÙŠØ±
+          Expanded(
+            flex: 4, // Ø§Ù„Ø¨Ø§Ù‚ÙŠ Ù„Ù„Ù†Øµ ÙˆØ§Ù„Ø²Ø±Ø§ÙŠØ±
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Ø§Ø³Ù… Ø§Ù„Ù…Ù†ØªØ¬
+                  Text(
+                    product.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13.5, height: 1.3),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Ø§Ù„Ø³Ø¹Ø±
+                  _buildPriceWidget(priceData),
+
+                  const Spacer(),
+
+                  // Ø§Ù„Ø²Ø±Ø§ÙŠØ± Ø¯Ø§ÙŠÙ…Ù‹Ø§ ÙÙŠ Ø§Ù„Ø£Ø³ÙÙ„
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: ElevatedButton(
+                            onPressed: () {},
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFE7E00),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text(
+                              "Add",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: Colors.white,
+                        child: Icon(
+                          product.isFavorite ? Icons.favorite : Icons.favorite_border,
+                          size: 18,
+                          color: product.isFavorite ? Colors.red : Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceWidget(Map<String, dynamic> priceData) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (priceData['hasDiscount'])
+          Text(
+            "${priceData['displayOriginal'].toStringAsFixed(3)} KWD",
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.red,
+              decoration: TextDecoration.lineThrough,
+            ),
+          ),
+        Text(
+          "${priceData['displayPrice'].toStringAsFixed(3)} KWD",
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+          ),
+        ),
+      ],
+    );
+  }
+}
+===== E:\product_details_task\lib\main.dart =====
+import 'package:flutter/material.dart';
+import 'core/api_service.dart';
+import 'features/product_details/data/repository/product_repo.dart';
+import 'features/product_details/screens/product_details_screen.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiRepositoryProvider(
+      providers: [
+        RepositoryProvider<ApiService>(
+          create: (_) => ApiService(),
+        ),
+        RepositoryProvider<ProductRepository>(
+          create: (context) => ProductRepository(
+            context.read<ApiService>(),
+          ),
+        ),
+      ],
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            fontFamily: 'Inter',
+            textTheme: const TextTheme(
+              displayLarge: TextStyle(fontWeight: FontWeight.w400), // Regular
+              displayMedium: TextStyle(fontWeight: FontWeight.w500), // Medium
+              displaySmall: TextStyle(fontWeight: FontWeight.w700), // Bold
+              headlineLarge: TextStyle(fontWeight: FontWeight.w700),
+              headlineMedium: TextStyle(fontWeight: FontWeight.w500),
+              headlineSmall: TextStyle(fontWeight: FontWeight.w400),
+              bodyLarge: TextStyle(fontWeight: FontWeight.w400),
+              bodyMedium: TextStyle(fontWeight: FontWeight.w500),
+              bodySmall: TextStyle(fontWeight: FontWeight.w400),
+              labelLarge: TextStyle(fontWeight: FontWeight.w500),
+              labelSmall: TextStyle(fontWeight: FontWeight.w400),
+            ),
+            primaryColor: const Color(0xFFFE7E00),
+          ),
+          home: ProductDetailsScreen(productId: 6),
+        ),
+
+    );
+  }
+}
